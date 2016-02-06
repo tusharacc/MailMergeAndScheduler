@@ -37,6 +37,10 @@ function getGlobals(){
   data = mailDetails.getDataRange().getValues();
   
   file = DriveApp.getFileById(attachmentID);
+  
+  emailQuotaRemaining = MailApp.getRemainingDailyQuota();
+  
+  Logger.log("Remaining Quota :" + emailQuotaRemaining);
 }
 
 function entryPoint(){
@@ -54,8 +58,8 @@ function entryPoint(){
     //The crux of the app. Currently, a user can send only 100 mails through App Script. Hence after 100 limit it reached, the script will just
     //a trigger that will be created for each 100 entries read. The trigger will be seprated by 24 Hrs.
     
-    if (mailCount > 100){
-      var sendMailAfter = 24 * Math.floor((i /100))*60 * 60 * 100
+    if (mailCount > emailQuotaRemaining){
+      var sendMailAfter = 24 * Math.max(Math.floor((i /100)),1)*60 * 60 * 1000
       if (sendMailAfter != previousValue){
         
         ScriptApp.newTrigger("sendScheduledMail")
