@@ -23,8 +23,9 @@ function getGlobals(){
   + "Thanks and Regards<br>Tushar Saurabh,<br>VP-Membership,<br>Medley Toastmasters Club.<br>Phone: 805-602-4308<br>"
   + "Like us on FB: http://www.facebook.com/MedleyToastmasters"
   
-  mailDetails = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Mail Merge");
-  mailTrigger = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Meeting Info");
+  spreadSheet = SpreadsheetApp.openById("1Xde65pEGL0KlGlnglE9LGjjSVGV15cuZAOVAosk71ak");
+  mailDetails = spreadSheet.getSheetByName("Mail Merge");
+  mailTrigger = spreadSheet.getSheetByName("Meeting Info");
   
   meetingNumber = getValueFromCell(mailTrigger,11,6);
   
@@ -50,7 +51,7 @@ function entryPoint(){
   var previousValue = "";
   var mailCount = 0;
   
-  for (var i = 1; i < data.length; i++) {
+  for (var i = data.length-1; i > 0; i--) {
     
     bodyWithFirstName = bodyTemplate.replace("{{First_Name}}",data[i][0]);
     mailBody = bodyWithFirstName.replace("{{Meet_Number}}",meetingNumber);
@@ -58,8 +59,10 @@ function entryPoint(){
     //The crux of the app. Currently, a user can send only 100 mails through App Script. Hence after 100 limit it reached, the script will just
     //a trigger that will be created for each 100 entries read. The trigger will be seprated by 24 Hrs.
     
+    //I have added 100 to i, since the mail is sent from last entry and hence it was done to fix the bug, that caused only one trigger to set.
+    
     if (mailCount > emailQuotaRemaining){
-      var sendMailAfter = 24 * Math.max(Math.floor((i /100)),1)*60 * 60 * 1000
+      var sendMailAfter = 24 * Math.max(Math.floor(((i+100) /100)),1)*60 * 60 * 1000
       if (sendMailAfter != previousValue){
         
         ScriptApp.newTrigger("sendScheduledMail")
@@ -74,15 +77,19 @@ function entryPoint(){
 //      if (i == 1){  
       if (data[i][2] != ""){
         mailCount = mailCount + 1;
-        MailApp.sendEmail({
-//          to: "XXXX@gmail.com",
+        try{
+          MailApp.sendEmail({
+            //          to: "XXXX@gmail.com",
             to:data[i][2],
-          subject: "Welcome to Medley Meeting",
-          htmlBody: mailBody,
-          attachments: file.getAs(MimeType.PDF)
-        });
-        mailDetails.getRange(1 + i, 7).setValue("EMAIL_SENT");
-        
+            subject: "Welcome to Medley Meeting",
+            htmlBody: mailBody,
+            attachments: file.getAs(MimeType.PDF)
+          });
+          mailDetails.getRange(1 + i, 7).setValue("EMAIL_SENT");
+        } catch (Err){
+          Logger.log(Err.message);
+          mailDetails.getRange(1 + i, 7).setValue("EMAIL_SENT_ERROR");
+        }
       }
     }
   }
@@ -94,27 +101,42 @@ function sendScheduledMail(){
   getGlobals();
   
   var mailCount = 0;
-  
-  for (var i = 1; i < data.length; i++) {
+  Logger.log("mail Detail " + mailDetails.getName());
+  Logger.log("data Length " + data.length);
+  for (var i = data.length - 1; i > 0; i--) {
     
-    if (mailDetails.getRange(1 + i, 7).getValue == "EMAIL_SCHEDULED"){
+    Logger.log("Email Status " + mailDetails.getRange(1 + i, 7).getValue());
+    if (data[i][6] == "EMAIL_SCHEDULED" && data[i][2] != "" ){
       
       bodyWithFirstName = bodyTemplate.replace("{{First_Name}}",data[i][0]);
       mailBody = bodyWithFirstName.replace("{{Meet_Number}}",meetingNumber);
       
-      if (mailCount <= 100){
+      if (emailQuotaRemaining > 0){
+        try{
         MailApp.sendEmail({
-          to: "tusharacc@gmail.com",
-     //     to:data[i][2],
+     //     to: "tusharacc@gmail.com",
+          to:data[i][2],
           subject: "Welcome to Medley Meeting",
           htmlBody: mailBody,
           attachments: file.getAs(MimeType.PDF)
         });
         mailCount = mailCount + 1;
         mailDetails.getRange(1 + i, 7).setValue("EMAIL_SENT");
+        } catch(Err){
+          Logger.log(Err.message);
+          mailDetails.getRange(1 + i, 7).setValue("EMAIL_SENT_ERROR");
+        }
       }
     }
+    emailQuotaRemaining = MailApp.getRemainingDailyQuota();
+    Logger.log("Mail Sent:" + mailCount)
   }
 }
-          
+        
+function getRemainingQuota(){
+  emailQuotaRemaining = MailApp.getRemainingDailyQuota();
+  
+  Logger.log("Remaining Quota :" + emailQuotaRemaining);
+  
+}
  
